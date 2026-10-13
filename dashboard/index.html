@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linux Memory-Mapped File Management System | OS Dashboard</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- App Container -->
+  <div class="app-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-microchip"></i>
+        </div>
+        <div class="brand-text">
+          <h2>MMAP SYSTEM</h2>
+          <span>Linux Virtual Memory</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li class="nav-item active" data-tab="dashboard">
+            <a href="#dashboard"><i class="fa-solid fa-gauge-high"></i> <span>Dashboard</span></a>
+          </li>
+          <li class="nav-item" data-tab="memory-mapping">
+            <a href="#memory-mapping"><i class="fa-solid fa-diagram-project"></i> <span>Memory Mapping</span></a>
+          </li>
+          <li class="nav-item" data-tab="file-operations">
+            <a href="#file-operations"><i class="fa-solid fa-sliders"></i> <span>File Operations</span></a>
+          </li>
+          <li class="nav-item" data-tab="activity-logs">
+            <a href="#activity-logs"><i class="fa-solid fa-terminal"></i> <span>Activity Logs</span></a>
+          </li>
+          <li class="nav-item" data-tab="system-info">
+            <a href="#system-info"><i class="fa-solid fa-server"></i> <span>System Information</span></a>
+          </li>
+          <li class="nav-item" data-tab="about-project">
+            <a href="#about-project"><i class="fa-solid fa-graduation-cap"></i> <span>About Project</span></a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="system-status-box">
+          <div class="status-indicator">
+            <span class="pulse-dot"></span>
+            <span class="status-label" id="sidebar-os-status">WSL2 / Linux Ready</span>
+          </div>
+          <div class="system-subtext" id="sidebar-kernel">Kernel 6.x POSIX</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button id="sidebar-toggle" class="icon-btn mobile-only" aria-label="Toggle navigation">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="header-titles">
+            <h1>Linux Memory-Mapped File Management System</h1>
+            <p class="subtitle">POSIX Virtual Memory Management &bull; Direct Pointer I/O Subsystem</p>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="header-badge" id="env-badge">
+            <i class="fa-brands fa-linux"></i>
+            <span id="header-env-text">Linux / WSL</span>
+          </div>
+          <div class="header-badge" id="mapping-badge">
+            <span class="status-pill status-unmapped" id="header-map-pill">UNMAPPED</span>
+          </div>
+          <button class="btn btn-primary" id="btn-run-demo" title="Execute full 10-step mmap lifecycle">
+            <i class="fa-solid fa-play"></i> Run Automated Demo
+          </button>
+        </div>
+      </header>
+
+      <!-- Toast / Notification Center -->
+      <div id="toast-container" class="toast-container"></div>
+
+      <!-- Tab 1: DASHBOARD (Overview) -->
+      <section id="tab-dashboard" class="tab-pane active">
+        <!-- System Alert Banner if Error -->
+        <div id="alert-banner" class="alert-banner hidden">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="alert-message">System notification message</span>
+          <button id="alert-close" class="alert-close-btn">&times;</button>
+        </div>
+
+        <!-- Metric Cards Grid (Status Overview) -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Target File</span>
+              <i class="fa-regular fa-file-code metric-icon"></i>
+            </div>
+            <div class="metric-value truncate" id="card-filename" title="No file open">No File Open</div>
+            <div class="metric-subtext" id="card-file-desc">Descriptor: <strong id="card-fd">-1</strong></div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">File Size (Disk)</span>
+              <i class="fa-solid fa-hard-drive metric-icon"></i>
+            </div>
+            <div class="metric-value" id="card-filesize">0 B</div>
+            <div class="metric-subtext" id="card-blocks">Blocks: 0 (512B)</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Virtual Memory Address</span>
+              <i class="fa-solid fa-memory metric-icon"></i>
+            </div>
+            <div class="metric-value font-mono truncate" id="card-address">NULL (Unmapped)</div>
+            <div class="metric-subtext" id="card-map-size">Mapped Size: <strong>0 B</strong></div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Mapping Status</span>
+              <i class="fa-solid fa-link metric-icon"></i>
+            </div>
+            <div class="metric-value">
+              <span class="badge badge-unmapped" id="badge-map-status">UNMAPPED</span>
+            </div>
+            <div class="metric-subtext">PROT_READ | PROT_WRITE</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Sync Status</span>
+              <i class="fa-solid fa-rotate metric-icon"></i>
+            </div>
+            <div class="metric-value">
+              <span class="badge badge-synced" id="badge-sync-status">SYNCED</span>
+            </div>
+            <div class="metric-subtext" id="card-sync-subtext">Pages Match Storage</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Kernel Page Size</span>
+              <i class="fa-solid fa-cubes metric-icon"></i>
+            </div>
+            <div class="metric-value" id="card-pagesize">4096 B</div>
+            <div class="metric-subtext" id="card-page-count">0 Pages Allocated</div>
+          </div>
+        </div>
+
+        <!-- Interactive Memory Visualization Section -->
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-sitemap"></i> Interactive Memory-Mapped Architecture Lifecycle</h3>
+              <p class="panel-subtitle">Visual state flow from physical disk file through Linux kernel VMA to user-space pointer mutation</p>
+            </div>
+            <div class="flow-legend">
+              <span class="legend-item"><span class="legend-dot active"></span> Active State</span>
+              <span class="legend-item"><span class="legend-dot normal"></span> Available</span>
+            </div>
+          </div>
+
+          <div class="memory-flow-container">
+            <div class="flow-track">
+              <!-- Node 1: File -->
+              <div class="flow-node active" id="node-file" data-step="1">
+                <div class="node-icon"><i class="fa-regular fa-file"></i></div>
+                <div class="node-title">PHYSICAL FILE</div>
+                <div class="node-meta" id="flow-file-name">Disk Storage</div>
+              </div>
+
+              <div class="flow-arrow" id="arrow-open">
+                <span class="arrow-label">open()</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </div>
+
+              <!-- Node 2: FD -->
+              <div class="flow-node" id="node-fd" data-step="2">
+                <div class="node-icon"><i class="fa-solid fa-hashtag"></i></div>
+                <div class="node-title">FILE DESCRIPTOR</div>
+                <div class="node-meta" id="flow-fd-val">FD: None</div>
+              </div>
+
+              <div class="flow-arrow" id="arrow-mmap">
+                <span class="arrow-label">mmap()</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </div>
+
+              <!-- Node 3: Memory Region -->
+              <div class="flow-node" id="node-memory" data-step="3">
+                <div class="node-icon"><i class="fa-solid fa-microchip"></i></div>
+                <div class="node-title">MEMORY REGION</div>
+                <div class="node-meta font-mono" id="flow-mem-addr">Virtual Addr</div>
+              </div>
+
+              <div class="flow-arrow" id="arrow-rw">
+                <span class="arrow-label">read / write</span>
+                <i class="fa-solid fa-arrows-left-right"></i>
+              </div>
+
+              <!-- Node 4: Pointer Access -->
+              <div class="flow-node" id="node-access" data-step="4">
+                <div class="node-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+                <div class="node-title">POINTER DEREFERENCE</div>
+                <div class="node-meta" id="flow-dirty-status">Clean / In-Sync</div>
+              </div>
+
+              <div class="flow-arrow" id="arrow-msync">
+                <span class="arrow-label">msync()</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </div>
+
+              <!-- Node 5: Sync / Disk Cache -->
+              <div class="flow-node" id="node-sync" data-step="5">
+                <div class="node-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                <div class="node-title">PAGE CACHE FLUSH</div>
+                <div class="node-meta">MS_SYNC</div>
+              </div>
+
+              <div class="flow-arrow" id="arrow-munmap">
+                <span class="arrow-label">munmap()</span>
+                <i class="fa-solid fa-arrow-right"></i>
+              </div>
+
+              <!-- Node 6: Teardown -->
+              <div class="flow-node" id="node-teardown" data-step="6">
+                <div class="node-icon"><i class="fa-solid fa-door-closed"></i></div>
+                <div class="node-title">TEARDOWN</div>
+                <div class="node-meta">munmap & close</div>
+              </div>
+            </div>
+
+            <!-- Active Kernel /proc/self/maps Inspection Bar -->
+            <div class="kernel-vma-box">
+              <span class="vma-label"><i class="fa-brands fa-linux"></i> Linux Kernel /proc/self/maps:</span>
+              <code class="vma-entry" id="vma-entry-text">No active mapping in process virtual address space</code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Operations Panel & Quick Controls -->
+        <div class="operations-panel-grid">
+          <!-- Left: Operation Buttons -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-gamepad"></i> System Call Control Center</h3>
+              <span class="badge badge-outline">REAL POSIX CALLS</span>
+            </div>
+            <div class="action-buttons-grid">
+              <button class="btn btn-action" id="action-btn-open">
+                <i class="fa-regular fa-folder-open"></i>
+                <div class="btn-text">
+                  <strong>Open File</strong>
+                  <span>open(O_RDWR)</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action" id="action-btn-create">
+                <i class="fa-solid fa-file-circle-plus"></i>
+                <div class="btn-text">
+                  <strong>Create File</strong>
+                  <span>open(O_CREAT)</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action btn-highlight" id="action-btn-map">
+                <i class="fa-solid fa-bolt"></i>
+                <div class="btn-text">
+                  <strong>Map Memory</strong>
+                  <span>mmap(MAP_SHARED)</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action" id="action-btn-read">
+                <i class="fa-solid fa-book-open"></i>
+                <div class="btn-text">
+                  <strong>Read Data</strong>
+                  <span>Pointer Read</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action" id="action-btn-write">
+                <i class="fa-solid fa-pen-nib"></i>
+                <div class="btn-text">
+                  <strong>Write Data</strong>
+                  <span>Direct memcpy()</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action btn-sync" id="action-btn-sync">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <div class="btn-text">
+                  <strong>Sync Changes</strong>
+                  <span>msync(MS_SYNC)</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action btn-warning" id="action-btn-unmap">
+                <i class="fa-solid fa-unlink"></i>
+                <div class="btn-text">
+                  <strong>Unmap Memory</strong>
+                  <span>munmap()</span>
+                </div>
+              </button>
+
+              <button class="btn btn-action btn-danger" id="action-btn-close">
+                <i class="fa-solid fa-circle-xmark"></i>
+                <div class="btn-text">
+                  <strong>Close File</strong>
+                  <span>close()</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Quick File Picker -->
+            <div class="quick-file-bar">
+              <label><i class="fa-solid fa-list-check"></i> Sample Files:</label>
+              <div class="sample-chips" id="sample-chips">
+                <button class="chip" data-file="sample_files/demo_mmap.txt">demo_mmap.txt</button>
+                <button class="chip" data-file="sample_files/os_test.txt">os_test.txt</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Direct In-Memory Write Quick Form -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-i-cursor"></i> Direct In-Memory Write</h3>
+              <span class="badge badge-warning" id="write-guard-badge">Requires Active mmap()</span>
+            </div>
+            <form id="memory-write-form" class="write-form">
+              <div class="form-row">
+                <div class="form-group form-group-sm">
+                  <label for="write-offset">Byte Offset</label>
+                  <input type="number" id="write-offset" value="0" min="0" placeholder="0">
+                </div>
+                <div class="form-group form-group-grow">
+                  <label for="write-text">Text to Write Directly to Memory Address</label>
+                  <input type="text" id="write-text" placeholder="e.g., MODIFIED BY POINTER DEREFERENCE">
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="btn-submit-write">
+                  <i class="fa-solid fa-pen-to-square"></i> Write Directly to Memory
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-quick-sync">
+                  <i class="fa-solid fa-arrows-rotate"></i> Flush with msync()
+                </button>
+              </div>
+              <p class="form-hint">
+                <i class="fa-solid fa-circle-info"></i> Writes directly into user-space virtual memory via <code>memcpy()</code> without issuing <code>write()</code> syscall. The dirty pages are flushed via <code>msync()</code>.
+              </p>
+            </form>
+          </div>
+        </div>
+
+        <!-- Mapped File Content Viewer (Text + Hex Dump) -->
+        <div class="panel-box">
+          <div class="panel-header">
+            <div class="content-viewer-header">
+              <h3><i class="fa-solid fa-eye"></i> Mapped File Content Viewer</h3>
+              <div class="viewer-tabs">
+                <button class="tab-btn active" data-view="text"><i class="fa-regular fa-file-lines"></i> Text View</button>
+                <button class="tab-btn" data-view="hex"><i class="fa-solid fa-binary"></i> Hex Dump</button>
+              </div>
+            </div>
+            <div class="viewer-actions">
+              <button class="btn btn-sm btn-secondary" id="btn-refresh-content">
+                <i class="fa-solid fa-rotate-right"></i> Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="viewer-container">
+            <!-- Text View Pane -->
+            <div id="view-text-pane" class="view-pane active">
+              <pre class="content-display font-mono" id="mapped-text-display">No file is currently mapped in memory. Open and Map a file to view content.</pre>
+            </div>
+
+            <!-- Hex Dump View Pane -->
+            <div id="view-hex-pane" class="view-pane">
+              <div class="hex-table-wrapper">
+                <table class="hex-table font-mono" id="hex-table">
+                  <thead>
+                    <tr>
+                      <th>Offset</th>
+                      <th>Virtual Address</th>
+                      <th>Hex Bytes (0-15)</th>
+                      <th>ASCII Preview</th>
+                    </tr>
+                  </thead>
+                  <tbody id="hex-table-body">
+                    <tr><td colspan="4" class="text-center text-muted">No memory mapped</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Activity Log Preview -->
+        <div class="panel-box">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-terminal"></i> Real-Time Activity Log</h3>
+            <div class="log-actions">
+              <button class="btn btn-sm btn-secondary" id="btn-clear-logs"><i class="fa-solid fa-trash-can"></i> Clear</button>
+              <button class="btn btn-sm btn-secondary" id="btn-copy-logs"><i class="fa-regular fa-copy"></i> Copy</button>
+            </div>
+          </div>
+          <div class="terminal-container">
+            <div class="terminal-bar">
+              <span class="terminal-dot red"></span>
+              <span class="terminal-dot yellow"></span>
+              <span class="terminal-dot green"></span>
+              <span class="terminal-title">mmap-system@linux:~$ tail -f activity.log</span>
+            </div>
+            <div class="terminal-body font-mono" id="terminal-logs">
+              <div class="log-line log-info">[00:00:00] [INFO] System initialized. Ready for operations.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: MEMORY MAPPING (Detailed Diagrams & Virtual Memory) -->
+      <section id="tab-memory-mapping" class="tab-pane">
+        <div class="panel-box">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-layer-group"></i> Virtual Memory Space Architecture</h3>
+            <span class="badge badge-info">x86_64 Architecture</span>
+          </div>
+          <div class="arch-explainer-grid">
+            <div class="arch-card">
+              <h4>Process Address Space Segment</h4>
+              <div class="address-space-diagram font-mono">
+                <div class="segment seg-kernel">0xFFFFFFFFFFFFFFFF &mdash; Linux Kernel Space (Protected)</div>
+                <div class="segment seg-stack">0x7FFFFFFFFFFF &mdash; User Stack (grows down) &darr;</div>
+                <div class="segment seg-mmap active-mmap">
+                  <strong>0x700000000000 &mdash; Memory Mapping Segment (mmap)</strong><br>
+                  <span id="vma-active-label">Current: Active Mapped Virtual Region</span>
+                </div>
+                <div class="segment seg-heap">0x000055555555 &mdash; Heap (malloc / brk) &uarr;</div>
+                <div class="segment seg-bss">.bss / .data (Global state variables)</div>
+                <div class="segment seg-text">0x000000000400 &mdash; Text Segment (Executable ELF binary)</div>
+              </div>
+            </div>
+
+            <div class="arch-card">
+              <h4>System Call Execution Mechanics</h4>
+              <div class="call-mechanics-list">
+                <div class="mechanic-item">
+                  <div class="call-badge">open()</div>
+                  <p>Allocates an entry in the process File Descriptor Table, linking to the Kernel Open File Table and physical inode.</p>
+                </div>
+                <div class="mechanic-item">
+                  <div class="call-badge">mmap()</div>
+                  <p>Creates a new <code>vm_area_struct</code> in the process Virtual Memory Area (VMA) with <code>PROT_READ | PROT_WRITE</code> and <code>MAP_SHARED</code>.</p>
+                </div>
+                <div class="mechanic-item">
+                  <div class="call-badge">Direct Access</div>
+                  <p>Process dereferences the returned virtual pointer. First access triggers a minor page fault; the kernel maps physical frames via Page Cache.</p>
+                </div>
+                <div class="mechanic-item">
+                  <div class="call-badge">msync()</div>
+                  <p>Scans dirty page table entries (PTEs) and synchronously writes modified cache blocks to physical disk via <code>MS_SYNC</code>.</p>
+                </div>
+                <div class="mechanic-item">
+                  <div class="call-badge">munmap()</div>
+                  <p>Tears down the VMA page table entries and releases the virtual address range back to the Linux virtual memory manager.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: FILE OPERATIONS (Complete Modal/Form Controls) -->
+      <section id="tab-file-operations" class="tab-pane">
+        <div class="operations-grid-two">
+          <!-- Open Existing File -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3><i class="fa-regular fa-folder-open"></i> Open Existing File</h3>
+            </div>
+            <form id="form-open-file" class="standard-form">
+              <div class="form-group">
+                <label for="input-open-path">File Path</label>
+                <input type="text" id="input-open-path" value="sample_files/demo_mmap.txt" placeholder="e.g., sample_files/demo_mmap.txt" required>
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="fa-regular fa-folder-open"></i> Open via open()</button>
+            </form>
+          </div>
+
+          <!-- Create New File -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-file-circle-plus"></i> Create New File</h3>
+            </div>
+            <form id="form-create-file" class="standard-form">
+              <div class="form-group">
+                <label for="input-create-path">File Path</label>
+                <input type="text" id="input-create-path" placeholder="e.g., sample_files/my_test.txt" required>
+              </div>
+              <div class="form-group">
+                <label for="input-create-content">Initial Content (Optional)</label>
+                <textarea id="input-create-content" rows="2" placeholder="Initial text to seed via write()"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Create via open(O_CREAT)</button>
+            </form>
+          </div>
+
+          <!-- Resize File (ftruncate) -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Resize File</h3>
+            </div>
+            <form id="form-resize-file" class="standard-form">
+              <div class="form-group">
+                <label for="input-resize-size">New Size (Bytes)</label>
+                <input type="number" id="input-resize-size" min="1" placeholder="e.g., 512" required>
+              </div>
+              <p class="form-hint"><i class="fa-solid fa-circle-exclamation"></i> Resizing automatically unmaps existing memory mappings to prevent SIGBUS faults.</p>
+              <button type="submit" class="btn btn-secondary"><i class="fa-solid fa-ruler-combined"></i> Resize via ftruncate()</button>
+            </form>
+          </div>
+
+          <!-- Close / Cleanup -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-shield-halved"></i> File Teardown & Lifecycle</h3>
+            </div>
+            <div class="standard-form">
+              <p>Close active file descriptor or safely unmap memory.</p>
+              <div class="form-actions-vert">
+                <button class="btn btn-warning" id="btn-direct-unmap"><i class="fa-solid fa-unlink"></i> Unmap Memory via munmap()</button>
+                <button class="btn btn-danger" id="btn-direct-close"><i class="fa-solid fa-circle-xmark"></i> Close File Descriptor via close()</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 4: ACTIVITY LOGS (Full Terminal) -->
+      <section id="tab-activity-logs" class="tab-pane">
+        <div class="panel-box">
+          <div class="panel-header">
+            <div>
+              <h3><i class="fa-solid fa-terminal"></i> Linux System Call Audit Log</h3>
+              <p class="panel-subtitle">Audited record of all POSIX system calls and direct memory mutations</p>
+            </div>
+            <div class="log-filter-bar">
+              <button class="btn btn-sm btn-filter active" data-filter="ALL">All</button>
+              <button class="btn btn-sm btn-filter" data-filter="SUCCESS">Success</button>
+              <button class="btn btn-sm btn-filter" data-filter="INFO">Info</button>
+              <button class="btn btn-sm btn-filter" data-filter="ERROR">Error</button>
+              <button class="btn btn-sm btn-secondary" id="btn-clear-logs-tab"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </div>
+
+          <div class="terminal-container terminal-full">
+            <div class="terminal-bar">
+              <span class="terminal-dot red"></span>
+              <span class="terminal-dot yellow"></span>
+              <span class="terminal-dot green"></span>
+              <span class="terminal-title">mmap_daemon &bull; POSIX Syscall Stream</span>
+            </div>
+            <div class="terminal-body font-mono" id="full-terminal-logs">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 5: SYSTEM INFORMATION -->
+      <section id="tab-system-info" class="tab-pane">
+        <div class="panel-box">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-circle-info"></i> Host Operating System & POSIX Environment</h3>
+          </div>
+          <div class="sysinfo-table-wrapper">
+            <table class="info-table">
+              <tbody>
+                <tr>
+                  <td><i class="fa-solid fa-desktop"></i> Operating System</td>
+                  <td id="sys-os">Linux</td>
+                </tr>
+                <tr>
+                  <td><i class="fa-solid fa-code-branch"></i> Kernel Release</td>
+                  <td id="sys-kernel" class="font-mono">Loading...</td>
+                </tr>
+                <tr>
+                  <td><i class="fa-solid fa-cube"></i> Virtualization / WSL</td>
+                  <td id="sys-wsl"><span class="badge badge-success">WSL2 Detected</span></td>
+                </tr>
+                <tr>
+                  <td><i class="fa-solid fa-microchip"></i> CPU Architecture</td>
+                  <td id="sys-arch" class="font-mono">x86_64</td>
+                </tr>
+                <tr>
+                  <td><i class="fa-solid fa-table-cells"></i> Memory Page Size</td>
+                  <td id="sys-page-size" class="font-mono">4096 Bytes (4 KB)</td>
+                </tr>
+                <tr>
+                  <td><i class="fa-solid fa-fingerprint"></i> Process Identifier (PID)</td>
+                  <td id="sys-pid" class="font-mono">-</td>
+                </tr>
+                <tr>
+                  <td><i class="fa-brands fa-python"></i> Integration Engine Runtime</td>
+                  <td id="sys-py-ver" class="font-mono">Python 3.x + ctypes ABI</td>
+                </tr>
+                <tr>
+                  <td><i class="fa-solid fa-file-code"></i> Core POSIX Engine</td>
+                  <td class="font-mono">libmmap_engine.so (Compiled via GCC with C11 / POSIX.1-2008)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 6: ABOUT PROJECT -->
+      <section id="tab-about-project" class="tab-pane">
+        <div class="panel-box">
+          <div class="panel-header">
+            <h3><i class="fa-solid fa-graduation-cap"></i> Project Presentation & Viva Guide</h3>
+          </div>
+          <div class="about-content">
+            <h4>Linux Memory-Mapped File Management System</h4>
+            <p>
+              This project demonstrates high-performance file I/O and virtual memory mapping using the POSIX <code>mmap()</code> family of Linux system calls. Traditional file access with <code>read()</code> and <code>write()</code> involves double-buffering and context switching between user space and kernel space. By mapping a file directly into the calling process's address space, data can be manipulated via standard memory pointers (e.g. <code>memcpy()</code>).
+            </p>
+
+            <div class="presentation-checklist">
+              <h4><i class="fa-solid fa-list-check"></i> Viva Demonstration Checklist:</h4>
+              <ol>
+                <li>
+                  <strong>Step 1: Open a File</strong> &mdash; Calls <code>open(O_RDWR)</code> and obtains a valid file descriptor (e.g. <code>FD: 3</code>).
+                </li>
+                <li>
+                  <strong>Step 2: Map into Memory</strong> &mdash; Invokes <code>mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)</code>. Point out the returned virtual address (e.g. <code>0x7063f004c000</code>) and the entry in <code>/proc/self/maps</code>.
+                </li>
+                <li>
+                  <strong>Step 3: Modify Data Directly</strong> &mdash; Type new text at offset 0 and click "Write Directly to Memory". Note that the write happens via C pointer dereference, and status changes to <span class="badge badge-warning">PENDING</span> (dirty page).
+                </li>
+                <li>
+                  <strong>Step 4: Synchronize with msync()</strong> &mdash; Click "Sync Changes" to invoke <code>msync(MS_SYNC)</code>. The kernel flushes dirty pages to disk, and status changes to <span class="badge badge-success">SYNCED</span>.
+                </li>
+                <li>
+                  <strong>Step 5: Unmap and Close</strong> &mdash; Call <code>munmap()</code> to release the virtual memory area, followed by <code>close()</code> to release the descriptor.
+                </li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Open File Modal -->
+  <div id="modal-open" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-regular fa-folder-open"></i> Open File</h3>
+        <button class="modal-close-btn" data-modal="modal-open">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label for="modal-input-filename">Enter File Path:</label>
+        <input type="text" id="modal-input-filename" class="modal-input" value="sample_files/demo_mmap.txt" placeholder="sample_files/demo_mmap.txt">
+        <div class="modal-quick-list">
+          <small>Or choose a quick sample file:</small>
+          <div class="chip-group">
+            <button class="chip chip-modal" data-file="sample_files/demo_mmap.txt">demo_mmap.txt</button>
+            <button class="chip chip-modal" data-file="sample_files/os_test.txt">os_test.txt</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal="modal-open">Cancel</button>
+        <button class="btn btn-primary" id="btn-modal-confirm-open">Open File</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create File Modal -->
+  <div id="modal-create" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-circle-plus"></i> Create New File</h3>
+        <button class="modal-close-btn" data-modal="modal-create">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="modal-create-name">File Name / Path:</label>
+          <input type="text" id="modal-create-name" class="modal-input" placeholder="sample_files/new_file.txt">
+        </div>
+        <div class="form-group">
+          <label for="modal-create-content">Initial Content (Bytes):</label>
+          <textarea id="modal-create-content" class="modal-input" rows="3" placeholder="Enter initial content for the file..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-modal="modal-create">Cancel</button>
+        <button class="btn btn-primary" id="btn-modal-confirm-create">Create via open(O_CREAT)</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
